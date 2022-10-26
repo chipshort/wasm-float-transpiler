@@ -1,0 +1,1 @@
+A small wasm program for testing purposes
