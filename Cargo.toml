@@ -1,3 +1,8 @@
 [workspace]
 
-members = ["wasm-float-transpiler", "wasm-test"]
+members = [
+    "wasm-float-runtime",
+    "wasm-float-transpiler",
+    "wasm-soft-floats",
+    "wasm-test",
+]

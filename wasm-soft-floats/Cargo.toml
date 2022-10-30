@@ -1,0 +1,24 @@
+[package]
+name = "wasm-soft-floats"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[dependencies]
+# simple-soft-float = "0.1"
+# rug
+# dashu-float = "0.2"
+rustc_apfloat = "0.1"
+num-traits = "0.2"
+
+[dev-dependencies]
+quickcheck = "1.0"
