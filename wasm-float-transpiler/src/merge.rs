@@ -1,18 +1,15 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use anyhow::*;
-use ouroboros::self_referencing;
-use rayon::prelude::*;
 use walrus::{
     ir::{
-        dfs_in_order, dfs_pre_order_mut, Instr, InstrSeq, LocalGet, LocalSet, LocalTee, Visitor,
-        VisitorMut,
+        dfs_in_order, Block, IfElse, Instr, InstrSeqId, LocalGet, LocalSet, LocalTee, Loop, Visitor,
     },
-    DataKind, FunctionBuilder, FunctionId, InstrSeqBuilder, LocalFunction, LocalId, Module,
-    ModuleData, ModuleFunctions, ModuleLocals, ModuleMemories, ModuleTypes,
+    DataKind, FunctionBuilder, LocalFunction, LocalId, Module, ModuleData, ModuleFunctions,
+    ModuleLocals, ModuleMemories, ModuleTypes,
 };
 
-use crate::traversal::{visit_instructions, TraversalInstr, TraversalVisitor};
+use crate::traversal::{visit_instructions, TraversalInstr};
 
 pub fn merge_modules(mut a: Module, mut b: Module) -> Result<Module> {
     let mem_offset = merge_memories(&mut b.memories, &mut a.memories, &mut b.data, &mut a.data)?;
@@ -122,11 +119,11 @@ fn copy_function(
     target_locals: &mut ModuleLocals,
     target_funcs: &mut ModuleFunctions,
     f: &LocalFunction,
-) -> () {
+) {
     // TODO: return FunctionId
     // create new builder with same type
     let ty = source_types.get(f.ty());
-    let mut builder = FunctionBuilder::new(target_types, ty.params(), ty.results());
+    let mut function_builder = FunctionBuilder::new(target_types, ty.params(), ty.results());
 
     // add locals used in function to target module
     let locals = copy_locals(source_locals, target_locals, f);
@@ -134,56 +131,75 @@ fn copy_function(
         println!("local: {:?}", local);
     }
 
-    let body_seq = (InstrSeqType::FuncBody, builder.func_body_id(), vec![]);
-    let mut instr_seqs = vec![body_seq];
+    let mut instr_seqs = vec![function_builder.func_body_id()];
 
     let visit = |instr: TraversalInstr| {
-        macro_rules! add_seq {
-            ($ty: expr, $seq:expr) => {{
-                let ty = $ty;
-                let seq = $seq;
-                // create new instruction sequence and add to stack
-                let instr_seq = builder.dangling_instr_seq(seq.ty);
-                instr_seqs.push((ty, instr_seq.id(), vec![]));
-            }};
-        }
-        macro_rules! add_instr {
-            ($instr: expr) => {{
-                let instr = $instr;
-                // add instruction to current instruction sequence
-                let (_, _, instrs) = instr_seqs.last_mut().expect("stack never empty");
+        fn add_instr(
+            function_builder: &mut FunctionBuilder,
+            instr_seqs: &[InstrSeqId],
+            instr: impl Into<Instr>,
+        ) {
+            // add instruction to current instruction sequence
+            let mut builder =
+                function_builder.instr_seq(*instr_seqs.last().expect("stack never empty"));
 
-                instrs.push(instr);
-            }};
+            builder.instr(instr);
         }
 
         match instr {
-            TraversalInstr::BlockStart(seq, _) => {
-                add_seq!(InstrSeqType::Block, seq);
+            TraversalInstr::BlockStart(seq, _)
+            | TraversalInstr::LoopStart(seq, _)
+            | TraversalInstr::IfStart(seq, _)
+            | TraversalInstr::ElseStart(seq, _) => {
+                instr_seqs.push(function_builder.dangling_instr_seq(seq.ty).id())
             }
-            TraversalInstr::LoopStart(seq, _) => add_seq!(InstrSeqType::Loop, seq),
-            TraversalInstr::IfStart(seq, _) => add_seq!(InstrSeqType::If, seq),
-            TraversalInstr::ElseStart(seq, _) => todo!(),
-            TraversalInstr::BlockEnd(_, _)
-            | TraversalInstr::LoopEnd(_, _)
-            | TraversalInstr::IfEnd(_, _, _) => {
-                let (ty, id, seq) = instr_seqs.pop().expect("stack never empty");
+            TraversalInstr::BlockEnd(_, _) => {
+                let seq = instr_seqs.pop().expect("stack never empty");
+                add_instr(&mut function_builder, &instr_seqs, Block { seq });
+            }
+            TraversalInstr::LoopEnd(_, _) => {
+                let seq = instr_seqs.pop().expect("stack never empty");
+                add_instr(&mut function_builder, &instr_seqs, Loop { seq });
+            }
+            TraversalInstr::IfEnd(_, _, _) => {
+                let else_seq = instr_seqs.pop().expect("stack never empty");
+                let if_seq = instr_seqs.pop().expect("stack never empty");
+                add_instr(
+                    &mut function_builder,
+                    &instr_seqs,
+                    IfElse {
+                        consequent: if_seq,
+                        alternative: else_seq,
+                    },
+                );
             }
             // TODO: replace memory access with new memory offset
             // replace local accesses with new local ids
-            TraversalInstr::Instr(Instr::LocalGet(l)) => add_instr!(Instr::LocalGet(LocalGet {
-                local: locals[&l.local],
-            })),
-            TraversalInstr::Instr(Instr::LocalSet(l)) => add_instr!(Instr::LocalSet(LocalSet {
-                local: locals[&l.local],
-            })),
-            TraversalInstr::Instr(Instr::LocalTee(l)) => add_instr!(Instr::LocalTee(LocalTee {
-                local: locals[&l.local],
-            })),
+            TraversalInstr::Instr(Instr::LocalGet(l)) => add_instr(
+                &mut function_builder,
+                &instr_seqs,
+                LocalGet {
+                    local: locals[&l.local],
+                },
+            ),
+            TraversalInstr::Instr(Instr::LocalSet(l)) => add_instr(
+                &mut function_builder,
+                &instr_seqs,
+                LocalSet {
+                    local: locals[&l.local],
+                },
+            ),
+            TraversalInstr::Instr(Instr::LocalTee(l)) => add_instr(
+                &mut function_builder,
+                &instr_seqs,
+                LocalTee {
+                    local: locals[&l.local],
+                },
+            ),
             // TODO: also change other instructions with new ids
             TraversalInstr::Instr(i) => {
                 // all other instructions are copied as is
-                add_instr!(i.clone());
+                add_instr(&mut function_builder, &instr_seqs, i.clone());
             }
             // not insterested in these
             TraversalInstr::FunctionStart(_) => {}
@@ -192,36 +208,6 @@ fn copy_function(
     };
 
     visit_instructions(visit, f, f.entry_block());
-
-    #[derive(Debug, PartialEq, Eq)]
-    enum InstrSeqType {
-        FuncBody,
-        Block,
-        Loop,
-        If,
-        Else,
-        /// Placeholder. Should only be set between the `start_instr_seq` call and the specialized call,
-        /// like `visit_block` or `visit_loop`.
-        Unknown,
-    }
-    struct CopyFunctions<'a> {
-        f: &'a LocalFunction,
-        builder: FunctionBuilder,
-        instr_seqs_stack: Vec<(InstrSeqType, walrus::ir::InstrSeqId, Vec<Instr>)>,
-        locals: HashMap<LocalId, LocalId>,
-    }
-    impl<'a> CopyFunctions<'a> {
-        /// Marks the last written instr_seq on the stack as the given InstrSeqType.
-        fn mark_last_instr_seq(&mut self, ty: InstrSeqType) {
-            let (instr_ty, _, _) = self.instr_seqs_stack.last_mut().expect("stack never empty");
-            assert_eq!(
-                instr_ty,
-                &InstrSeqType::Unknown,
-                "mark_last_instr_seq called, but the last instr_seq is already marked"
-            );
-            *instr_ty = ty;
-        }
-    }
 }
 
 // find all locals used in the function and add them to the new module
@@ -250,23 +236,6 @@ fn copy_locals(
             let local = self.source_locals.get(*id);
             let new_local_id = self.target_locals.add(local.ty());
             self.map.insert(*id, new_local_id);
-        }
-    }
-}
-
-fn used_locals(f: &LocalFunction) -> HashSet<LocalId> {
-    let mut locals = Used::default();
-    dfs_in_order(&mut locals, f, f.entry_block());
-    return locals.locals;
-
-    #[derive(Default)]
-    struct Used {
-        locals: HashSet<LocalId>,
-    }
-
-    impl<'a> Visitor<'a> for Used {
-        fn visit_local_id(&mut self, id: &LocalId) {
-            self.locals.insert(*id);
         }
     }
 }

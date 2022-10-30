@@ -71,7 +71,3 @@ pub enum TraversalInstr<'instr> {
     /// Called for all instructions, even those that are covered by the other variants.
     Instr(&'instr Instr),
 }
-
-pub trait TraversalVisitor<'instr> {
-    fn visit(&mut self, instr: &'instr TraversalInstr);
-}
