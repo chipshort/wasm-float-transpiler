@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use anyhow::*;
 use walrus::{
     ir::{
-        dfs_in_order, Block, IfElse, Instr, InstrSeqId, LocalGet, LocalSet, LocalTee, Loop, Visitor,
+        dfs_in_order, Block, Br, BrIf, BrTable, IfElse, Instr, InstrSeqId, LocalGet, LocalSet,
+        LocalTee, Loop, Visitor,
     },
-    DataKind, FunctionBuilder, LocalFunction, LocalId, Module, ModuleData, ModuleFunctions,
-    ModuleLocals, ModuleMemories, ModuleTypes,
+    DataKind, FunctionBuilder, FunctionKind, LocalFunction, LocalId, Module, ModuleData,
+    ModuleFunctions, ModuleLocals, ModuleMemories, ModuleTypes,
 };
 
 use crate::traversal::{visit_instructions, TraversalInstr};
@@ -15,14 +16,9 @@ pub fn merge_modules(mut a: Module, mut b: Module) -> Result<Module> {
     let mem_offset = merge_memories(&mut b.memories, &mut a.memories, &mut b.data, &mut a.data)?;
     println!("mem_offset: {}", mem_offset);
 
-    merge_functions(
-        &mut b.types,
-        &mut a.types,
-        &mut b.locals,
-        &mut a.locals,
-        &mut b.funcs,
-        &mut a.funcs,
-    )?;
+    merge_functions(&mut b, &mut a)?;
+
+    // println!("{:#?}", a);
 
     // cleanup unused functions
     // walrus::passes::gc::run(&mut a);
@@ -85,61 +81,51 @@ fn clone_kind(kind: &DataKind) -> DataKind {
     }
 }
 
-fn merge_functions(
-    source_types: &mut ModuleTypes,
-    target_types: &mut ModuleTypes,
-    source_locals: &mut ModuleLocals,
-    target_locals: &mut ModuleLocals,
-    source_funcs: &mut ModuleFunctions,
-    target_funcs: &mut ModuleFunctions,
-) -> Result<()> {
+fn merge_functions(source: &mut Module, target: &mut Module) -> Result<()> {
     // let function_id_map = HashMap::new();
 
-    for (b_id, b_fun) in source_funcs.iter_local_mut() {
-        println!("function id: {:?}", b_id);
-        copy_function(
-            source_types,
-            target_types,
-            source_locals,
-            target_locals,
-            target_funcs,
-            b_fun,
-        );
+    let source_functions = source.funcs.iter_mut().filter_map(|f| match &f.kind {
+        FunctionKind::Local(local) => Some((f.name.take(), local)),
+        _ => None,
+    });
+
+    // move functions from
+    for (name, function) in source_functions {
+        copy_function(source, target, function, name);
         // let new_id = a_funcs.add_local(b_fun.);
         // function_id_map.insert(b_id, new_id);
     }
 
+    // TODO: go over all *inserted* functions and change ids of call instructions
+
     Ok(())
 }
 
-fn copy_function(
-    source_types: &mut ModuleTypes,
-    target_types: &mut ModuleTypes,
-    source_locals: &mut ModuleLocals,
-    target_locals: &mut ModuleLocals,
-    target_funcs: &mut ModuleFunctions,
-    f: &LocalFunction,
-) {
+fn copy_function(source: &Module, target: &mut Module, f: &LocalFunction, name: Option<String>) {
     // TODO: return FunctionId
     // create new builder with same type
-    let ty = source_types.get(f.ty());
-    let mut function_builder = FunctionBuilder::new(target_types, ty.params(), ty.results());
+    let ty = source.types.get(f.ty());
+    let mut function_builder = FunctionBuilder::new(&mut target.types, ty.params(), ty.results());
+    if let Some(name) = name {
+        function_builder.name(name);
+    }
 
     // add locals used in function to target module
-    let locals = copy_locals(source_locals, target_locals, f);
-    for local in locals.iter() {
-        println!("local: {:?}", local);
-    }
+    let locals = copy_locals(&source.locals, &mut target.locals, f);
+
+    // translates old sequence ids to new ones
+    let mut seq_ids = HashMap::new();
+    seq_ids.insert(f.entry_block(), function_builder.func_body_id());
 
     let mut instr_seqs = vec![function_builder.func_body_id()];
 
     let visit = |instr: TraversalInstr| {
+        /// Adds the instruction to the current instruction sequence (last entry in `instr_seqs`)
         fn add_instr(
             function_builder: &mut FunctionBuilder,
             instr_seqs: &[InstrSeqId],
             instr: impl Into<Instr>,
         ) {
-            // add instruction to current instruction sequence
             let mut builder =
                 function_builder.instr_seq(*instr_seqs.last().expect("stack never empty"));
 
@@ -151,7 +137,10 @@ fn copy_function(
             | TraversalInstr::LoopStart(seq, _)
             | TraversalInstr::IfStart(seq, _)
             | TraversalInstr::ElseStart(seq, _) => {
-                instr_seqs.push(function_builder.dangling_instr_seq(seq.ty).id())
+                // creating a dangling sequence that will be added in the corresponding `TraversalInstr::***End` variant
+                let new_seq_id = function_builder.dangling_instr_seq(seq.ty).id();
+                seq_ids.insert(seq.id(), new_seq_id);
+                instr_seqs.push(new_seq_id);
             }
             TraversalInstr::BlockEnd(_, _) => {
                 let seq = instr_seqs.pop().expect("stack never empty");
@@ -196,6 +185,39 @@ fn copy_function(
                     local: locals[&l.local],
                 },
             ),
+            // replace instruction sequence ids with new ones
+            TraversalInstr::Instr(Instr::Br(Br { block })) => {
+                add_instr(
+                    &mut function_builder,
+                    &instr_seqs,
+                    Br {
+                        block: seq_ids[block],
+                    },
+                );
+            }
+            TraversalInstr::Instr(Instr::BrIf(BrIf { block })) => {
+                // check if sequence id is in parents
+                // if !instr_seqs.iter().any(|&seq| seq == seq_ids[block]) {
+                //     panic!("invalid br_if");
+                // }
+                add_instr(
+                    &mut function_builder,
+                    &instr_seqs,
+                    BrIf {
+                        block: seq_ids[block],
+                    },
+                );
+            }
+            TraversalInstr::Instr(Instr::BrTable(BrTable { blocks, default })) => {
+                add_instr(
+                    &mut function_builder,
+                    &instr_seqs,
+                    BrTable {
+                        blocks: blocks.iter().map(|b| seq_ids[b]).collect(),
+                        default: seq_ids[default],
+                    },
+                );
+            }
             // TODO: also change other instructions with new ids
             TraversalInstr::Instr(i) => {
                 // all other instructions are copied as is
@@ -208,11 +230,14 @@ fn copy_function(
     };
 
     visit_instructions(visit, f, f.entry_block());
+
+    let args = f.args.iter().map(|a| locals[a]).collect();
+    function_builder.finish(args, &mut target.funcs);
 }
 
 // find all locals used in the function and add them to the new module
 fn copy_locals(
-    source_locals: &mut ModuleLocals,
+    source_locals: &ModuleLocals,
     target_locals: &mut ModuleLocals,
     f: &LocalFunction,
 ) -> HashMap<LocalId, LocalId> {
@@ -232,10 +257,10 @@ fn copy_locals(
     }
     impl<'a, 'b> Visitor<'a> for CopyLocals<'b> {
         fn visit_local_id(&mut self, id: &LocalId) {
-            println!("vist_local_id: {:?}", id);
-            let local = self.source_locals.get(*id);
-            let new_local_id = self.target_locals.add(local.ty());
-            self.map.insert(*id, new_local_id);
+            self.map.entry(*id).or_insert_with(|| {
+                let local = self.source_locals.get(*id);
+                self.target_locals.add(local.ty())
+            });
         }
     }
 }
