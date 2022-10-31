@@ -1,33 +1,37 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::*;
+use rayon::prelude::*;
 use walrus::{
     ir::{
-        dfs_in_order, Block, Br, BrIf, BrTable, IfElse, Instr, InstrSeqId, LocalGet, LocalSet,
-        LocalTee, Loop, Visitor,
+        dfs_in_order, dfs_pre_order_mut, AtomicNotify, AtomicRmw, AtomicWait, Block, Br, BrIf,
+        BrTable, Cmpxchg, IfElse, Instr, InstrSeqId, Load, LoadSimd, LocalGet, LocalSet, LocalTee,
+        Loop, Store, Visitor, VisitorMut,
     },
-    DataKind, FunctionBuilder, FunctionKind, LocalFunction, LocalId, Module, ModuleData,
-    ModuleFunctions, ModuleLocals, ModuleMemories, ModuleTypes,
+    DataKind, FunctionBuilder, FunctionId, FunctionKind, LocalFunction, LocalId, Module,
+    ModuleData, ModuleLocals, ModuleMemories,
 };
 
 use crate::traversal::{visit_instructions, TraversalInstr};
 
+/// Merges the two modules into a single module.
+/// The combined module will have the functions from both.
+/// # WARNING
+/// This is very experimental and will probably break in many cases.
+/// It works for simple modules that don't use memory or tables.
 pub fn merge_modules(mut a: Module, mut b: Module) -> Result<Module> {
-    let mem_offset = merge_memories(&mut b.memories, &mut a.memories, &mut b.data, &mut a.data)?;
+    let mem_offset = merge_memories(&b.memories, &mut a.memories, &mut b.data, &mut a.data)?;
     println!("mem_offset: {}", mem_offset);
 
-    merge_functions(&mut b, &mut a)?;
+    merge_functions(&b, &mut a, mem_offset)?;
+    // TODO: copy everything else, like globals, tables, etc.
 
-    // println!("{:#?}", a);
-
-    // cleanup unused functions
-    // walrus::passes::gc::run(&mut a);
     Ok(a)
 }
 
 /// copies memory from `b` to `a`, returning the offset at which `b` lives after that
 fn merge_memories(
-    source_mem: &mut ModuleMemories,
+    source_mem: &ModuleMemories,
     target_mem: &mut ModuleMemories,
     source_data: &mut ModuleData,
     target_data: &mut ModuleData,
@@ -81,19 +85,68 @@ fn clone_kind(kind: &DataKind) -> DataKind {
     }
 }
 
-fn merge_functions(source: &mut Module, target: &mut Module) -> Result<()> {
-    // let function_id_map = HashMap::new();
-
-    let source_functions = source.funcs.iter_mut().filter_map(|f| match &f.kind {
-        FunctionKind::Local(local) => Some((f.name.take(), local)),
+fn merge_functions(source: &Module, target: &mut Module, memory_offset: u32) -> Result<()> {
+    let source_functions = source.funcs.iter().filter_map(|f| match &f.kind {
+        FunctionKind::Local(local) => Some((f.id(), f.name.clone(), local)),
         _ => None,
     });
 
+    let mut copied_functions = HashMap::new();
+    let mut copied_functions_ids = HashSet::new();
     // move functions from
-    for (name, function) in source_functions {
-        copy_function(source, target, function, name);
+    for (id, name, function) in source_functions {
+        let new_id = copy_function(source, target, function, name);
         // let new_id = a_funcs.add_local(b_fun.);
-        // function_id_map.insert(b_id, new_id);
+        copied_functions.insert(id, new_id);
+        copied_functions_ids.insert(new_id);
+    }
+
+    target
+        .funcs
+        .par_iter_local_mut()
+        .filter(|(id, _)| copied_functions_ids.contains(id))
+        .for_each(|(_, f)| {
+            dfs_pre_order_mut(
+                &mut RefFixer {
+                    func_map: &copied_functions,
+                    memory_offset,
+                },
+                f,
+                f.entry_block(),
+            )
+        });
+
+    struct RefFixer<'a> {
+        func_map: &'a HashMap<FunctionId, FunctionId>,
+        memory_offset: u32,
+    }
+
+    impl<'a> VisitorMut for RefFixer<'a> {
+        // fix function calls
+        fn visit_call_mut(&mut self, instr: &mut walrus::ir::Call) {
+            if let Some(new_id) = self.func_map.get(&instr.func) {
+                instr.func = *new_id;
+            }
+        }
+        fn visit_call_indirect_mut(&mut self, instr: &mut walrus::ir::CallIndirect) {
+            // TODO: how does this work?
+        }
+
+        // shift all memory accesses by the offset
+        fn visit_instr_mut(&mut self, instr: &mut Instr, _: &mut walrus::InstrLocId) {
+            match instr {
+                Instr::Load(Load { arg, .. })
+                | Instr::Store(Store { arg, .. })
+                | Instr::AtomicRmw(AtomicRmw { arg, .. })
+                | Instr::Cmpxchg(Cmpxchg { arg, .. })
+                | Instr::AtomicNotify(AtomicNotify { arg, .. })
+                | Instr::AtomicWait(AtomicWait { arg, .. })
+                | Instr::LoadSimd(LoadSimd { arg, .. }) => {
+                    arg.offset += self.memory_offset;
+                }
+                _ => {} // ignore all other instructions
+            }
+        }
     }
 
     // TODO: go over all *inserted* functions and change ids of call instructions
@@ -101,8 +154,12 @@ fn merge_functions(source: &mut Module, target: &mut Module) -> Result<()> {
     Ok(())
 }
 
-fn copy_function(source: &Module, target: &mut Module, f: &LocalFunction, name: Option<String>) {
-    // TODO: return FunctionId
+fn copy_function(
+    source: &Module,
+    target: &mut Module,
+    f: &LocalFunction,
+    name: Option<String>,
+) -> FunctionId {
     // create new builder with same type
     let ty = source.types.get(f.ty());
     let mut function_builder = FunctionBuilder::new(&mut target.types, ty.params(), ty.results());
@@ -232,7 +289,7 @@ fn copy_function(source: &Module, target: &mut Module, f: &LocalFunction, name: 
     visit_instructions(visit, f, f.entry_block());
 
     let args = f.args.iter().map(|a| locals[a]).collect();
-    function_builder.finish(args, &mut target.funcs);
+    function_builder.finish(args, &mut target.funcs)
 }
 
 // find all locals used in the function and add them to the new module
