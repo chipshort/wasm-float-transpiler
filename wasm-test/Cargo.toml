@@ -1,8 +1,0 @@
-[package]
-name    = "wasm-test"
-version = "0.1.0"
-edition = "2021"
-authors = ["Christoph Otter <chris@confio.gmbh>"]
-
-[lib]
-crate-type = ["cdylib"]

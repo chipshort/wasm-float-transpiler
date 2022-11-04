@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-walrus = { version = "0.19", features = ["parallel"] }
+walrus = { path = "../../walrus", features = ["parallel"] }
 rayon = "1.5"
 anyhow = "1"
-ouroboros = "0.15"
+const_format = { version = "0.2.30", features = ["rust_1_51"] }

@@ -9,7 +9,7 @@ use walrus::{
         Loop, Store, Visitor, VisitorMut,
     },
     DataKind, FunctionBuilder, FunctionId, FunctionKind, LocalFunction, LocalId, Module,
-    ModuleData, ModuleLocals, ModuleMemories,
+    ModuleLocals,
 };
 
 use crate::traversal::{visit_instructions, TraversalInstr};
@@ -20,59 +20,111 @@ use crate::traversal::{visit_instructions, TraversalInstr};
 /// This is very experimental and will probably break in many cases.
 /// It works for simple modules that don't use memory or tables.
 pub fn merge_modules(mut a: Module, mut b: Module) -> Result<Module> {
-    let mem_offset = merge_memories(&b.memories, &mut a.memories, &mut b.data, &mut a.data)?;
+    let mem_offset = merge_memories(&mut b, &mut a)?;
     println!("mem_offset: {}", mem_offset);
 
     merge_functions(&b, &mut a, mem_offset)?;
-    // TODO: copy everything else, like globals, tables, etc.
+    // TODO: copy everything else, like globals, tables, elements, data etc.
 
     Ok(a)
 }
 
 /// copies memory from `b` to `a`, returning the offset at which `b` lives after that
-fn merge_memories(
-    source_mem: &ModuleMemories,
-    target_mem: &mut ModuleMemories,
-    source_data: &mut ModuleData,
-    target_data: &mut ModuleData,
-) -> Result<u32> {
+fn merge_memories(source: &mut Module, target: &mut Module) -> Result<u32> {
     // TODO: handle imported memories?
-    let a_mems = target_mem.iter().count();
-    let b_mems = source_mem.iter().count();
+    let target_mems = target.memories.iter().count();
+    let source_mems = source.memories.iter().count();
 
-    Ok(match (a_mems, b_mems) {
+    Ok(match (target_mems, source_mems) {
         (0, 0) => 0,
         (0, 1) => {
-            let mem = source_mem.iter().next().expect("length checked above");
-            target_mem.add_local(mem.shared, mem.initial, mem.maximum);
+            let mem = source.memories.iter().next().expect("length checked above");
+            target
+                .memories
+                .add_local(mem.shared, mem.initial, mem.maximum);
             0
         }
-        (1, 0) => 0, // nothing to do, since we modify `a` in place
+        (1, 0) => 0, // nothing to do, since we modify `target` in place
         (1, 1) => {
             // combine memories
-            let a_mem = target_mem.iter_mut().next().expect("length checked above");
-            let b_mem = source_mem.iter().next().expect("length checked above");
+            let target_mem = target
+                .memories
+                .iter_mut()
+                .next()
+                .expect("length checked above");
+            let source_mem = source.memories.iter().next().expect("length checked above");
 
-            let old_a_len = a_mem.initial;
-            a_mem.shared = a_mem.shared || b_mem.shared;
-            a_mem.initial += b_mem.initial;
+            let old_target_len = target_mem.initial;
+            target_mem.shared = target_mem.shared || source_mem.shared;
+            target_mem.initial += source_mem.initial;
 
             // TODO: no idea if this even works like that?
-            a_mem.maximum = a_mem
-                .maximum
-                .map(|a_max| a_max + b_mem.maximum.unwrap_or_default());
+            target_mem.maximum = Some(
+                target_mem.maximum.unwrap_or(target_mem.initial)
+                    + source_mem.maximum.unwrap_or(source_mem.initial),
+            );
             // TODO: import?
 
-            // copy all data segments from `b` to `a`
-            b_mem.data_segments.iter().for_each(|data_id| {
-                let data = source_data.get(*data_id);
-                a_mem
+            // copy all data segments from `source` to `target`
+            source_mem.data_segments.iter().for_each(|data_id| {
+                let data = source.data.get(*data_id);
+                target_mem
                     .data_segments
-                    .insert(target_data.add(clone_kind(&data.kind), data.value.clone()));
-                // remove from `b` so we don't double copy it
-                source_data.delete(*data_id);
+                    .insert(target.data.add(clone_kind(&data.kind), data.value.clone()));
+                // remove, so we don't double copy it
+                source.data.delete(*data_id);
             });
-            old_a_len
+            old_target_len
+        }
+        _ => bail!("wasm module with more than one memory is not supported"),
+    })
+}
+
+/// copies the table from `source` to `target`, returning the offset at which `b` lives after that
+fn merge_tables(source: &mut Module, target: &mut Module) -> Result<u32> {
+    // TODO: handle imported memories?
+    let target_tables = target.tables.iter().count();
+    let source_tables = source.tables.iter().count();
+
+    Ok(match (target_tables, source_tables) {
+        (0, 0) => 0,
+        (0, 1) => {
+            let tbl = source.tables.iter().next().expect("length checked above");
+            target
+                .tables
+                .add_local(tbl.initial, tbl.maximum, tbl.element_ty);
+            0
+        }
+        (1, 0) => 0, // nothing to do, since we modify `target` in place
+        (1, 1) => {
+            // combine tables
+            let target_tbl = target
+                .tables
+                .iter_mut()
+                .next()
+                .expect("length checked above");
+            let source_tbl = source.tables.iter().next().expect("length checked above");
+
+            let old_target_len = target_tbl.initial;
+            target_tbl.initial += source_tbl.initial;
+            // TODO: no idea if this even works like that?
+            target_tbl.maximum = target_tbl
+                .maximum
+                .map(|a_max| a_max + source_tbl.maximum.unwrap_or_default());
+            // TODO: import?
+
+            // copy all element segments from `source` to `target`
+            source_tbl.elem_segments.iter().for_each(|elem_id| {
+                let elem = source.elements.get(*elem_id);
+                target_tbl.elem_segments.insert(target.elements.add(
+                    elem.kind,
+                    elem.ty,
+                    elem.members.clone(),
+                ));
+                // remove from `b` so we don't double copy it
+                source.elements.delete(*elem_id);
+            });
+            old_target_len
         }
         _ => bail!("wasm module with more than one memory is not supported"),
     })
@@ -128,7 +180,7 @@ fn merge_functions(source: &Module, target: &mut Module, memory_offset: u32) -> 
                 instr.func = *new_id;
             }
         }
-        fn visit_call_indirect_mut(&mut self, instr: &mut walrus::ir::CallIndirect) {
+        fn visit_call_indirect_mut(&mut self, _instr: &mut walrus::ir::CallIndirect) {
             // TODO: how does this work?
         }
 

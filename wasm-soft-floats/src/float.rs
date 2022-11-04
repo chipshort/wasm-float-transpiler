@@ -3,14 +3,16 @@
 //! https://webassembly.github.io/spec/core/exec/numerics.html#floating-point-operations
 //! # Rounding
 //! round-to-nearest ties-to-even
+//!
 //! # NaN propagation
 //! According to WebAssembly spec, the sign and payload are non-deterministic,
 //! but this crate will always return the same result for the same input,
 //! regardless of CPU architecture / instruction set.
+//!
+//! # Scope
+//! This implementation only provides very basic operations for now to fill in the gaps of the other backends.
 
-use core::ops::{Add, Div, Mul, Neg, Sub};
-
-use rustc_apfloat::Float;
+use core::ops::Neg;
 
 trait Test {
     fn test();
@@ -42,14 +44,6 @@ macro_rules! impl_float {
             pub const ZERO: Self = Self::from_bits(0);
             pub const NEG_ZERO: Self = Self::from_bits(Self::SIGN_MASK);
 
-            pub(crate) const fn exponent(self) -> $bits {
-                self.0 & Self::EXP_MASK
-            }
-
-            pub(crate) const fn fraction(self) -> $bits {
-                self.0 & Self::FRAC_MASK
-            }
-
             pub const fn is_sign_positive(self) -> bool {
                 self.0 & Self::SIGN_MASK == 0
             }
@@ -62,7 +56,7 @@ macro_rules! impl_float {
 
             /// Returns true if `self` is some kind of NaN.
             pub const fn is_nan(self) -> bool {
-                self.exponent() == Self::EXP_MASK && self.fraction() != 0
+                (self.0 & Self::EXP_MASK) == Self::EXP_MASK && (self.0 & Self::FRAC_MASK) != 0
             }
 
             /// Returns true if `self` is positive or negative infinity.
@@ -127,151 +121,59 @@ macro_rules! impl_float {
                 }
             }
         }
-
-        impl Add for $name {
-            type Output = Self;
-
-            /// Adds `self` to `rhs` and returns the result.
-            ///
-            /// https://webassembly.github.io/spec/core/exec/numerics.html#op-fadd
-            fn add(self, rhs: Self) -> Self::Output {
-                // just calling rustc_apfloat for now, because it's easier
-                let a = rustc_apfloat::ieee::Single::from_bits(self.0 as u128);
-                let b = rustc_apfloat::ieee::Single::from_bits(rhs.0 as u128);
-
-                let result = a + b;
-                Self(rustc_apfloat::ieee::Semantics::to_bits(result.value) as $bits)
-            }
-        }
-
-        impl Sub for $name {
-            type Output = Self;
-
-            /// Subtracts `rhs` from `self` and returns the result.
-            ///
-            /// https://webassembly.github.io/spec/core/exec/numerics.html#op-fsub
-            fn sub(self, rhs: Self) -> Self::Output {
-                // just calling rustc_apfloat for now, because it's easier
-                let a = rustc_apfloat::ieee::Single::from_bits(self.0 as u128);
-                let b = rustc_apfloat::ieee::Single::from_bits(rhs.0 as u128);
-
-                let result = a - b;
-                Self(rustc_apfloat::ieee::Semantics::to_bits(result.value) as $bits)
-            }
-        }
-
-        impl Mul for $name {
-            type Output = Self;
-
-            /// Multiplies `self` by `rhs` and returns the result.
-            ///
-            /// https://webassembly.github.io/spec/core/exec/numerics.html#op-fmul
-            fn mul(self, rhs: Self) -> Self::Output {
-                // just calling rustc_apfloat for now, because it's easier
-                let a = rustc_apfloat::ieee::Single::from_bits(self.0 as u128);
-                let b = rustc_apfloat::ieee::Single::from_bits(rhs.0 as u128);
-
-                let result = a * b;
-                Self(rustc_apfloat::ieee::Semantics::to_bits(result.value) as $bits)
-            }
-        }
-
-        impl Div for $name {
-            type Output = Self;
-
-            /// Divides `self` by `rhs` and returns the result.
-            ///
-            /// https://webassembly.github.io/spec/core/exec/numerics.html#op-fdiv
-            fn div(self, rhs: Self) -> Self::Output {
-                // just calling rustc_apfloat for now, because it's easier
-                let a = rustc_apfloat::ieee::Single::from_bits(self.0 as u128);
-                let b = rustc_apfloat::ieee::Single::from_bits(rhs.0 as u128);
-
-                let result = a / b;
-                Self(rustc_apfloat::ieee::Semantics::to_bits(result.value) as $bits)
-            }
-        }
     };
 }
 
 impl_float!(F32, u32, 8);
 impl_float!(F64, u64, 11);
 
+impl F32 {
+    /// Returns the same value as `self`, but with as a `F64`.
+    ///
+    /// Example:
+    /// ```
+    /// use wasm_soft_floats::{F32, F64};
+    /// assert_eq!(F32::from_bits(3.678f32.to_bits()).promote().to_bits(), F64::from_bits(3.678f64.to_bits()).to_bits());
+    /// ```
+    pub fn promote(self) -> F64 {
+        // handle NaNs
+        if self.is_nan() {
+            return F64::NAN;
+        }
+
+        const BIT_DIFF: usize = F64::BIT_SIZE - F32::BIT_SIZE;
+        const EXP_DIFF: usize = F64::EXP_BITS - F32::EXP_BITS;
+        println!("{} {}", BIT_DIFF, EXP_DIFF);
+        let exp_bits = self.0 & Self::EXP_MASK;
+        let frac_bits = self.0 & Self::FRAC_MASK;
+        let sign_bit = self.0 & Self::SIGN_MASK;
+        println!("{:032b}\n{:032b}\n{:032b}", exp_bits, frac_bits, sign_bit);
+        // get all the parts of the float
+        let exp_bits = (self.0 & Self::EXP_MASK) as u64;
+        let frac_bits = (self.0 & Self::FRAC_MASK) as u64;
+        let sign_bit = (self.0 & Self::SIGN_MASK) as u64;
+
+        println!("{:064b}\n{:064b}\n{:064b}", exp_bits, frac_bits, sign_bit);
+        // shift the bits to the right place
+        let exp_bits = exp_bits << (BIT_DIFF - EXP_DIFF);
+        let sign_bit = sign_bit << BIT_DIFF;
+        // combine the bits
+        let bits = exp_bits | frac_bits | sign_bit;
+        F64(bits)
+    }
+}
+
 #[cfg(test)]
-mod test {
-    use super::*;
-    use core::ops::Neg;
+mod tests {
     use quickcheck::quickcheck;
+
+    use super::*;
 
     quickcheck! {
         fn sign_works(f: f32) -> bool {
             let sf = F32(f.to_bits());
 
             sf.is_sign_positive() == f.is_sign_positive()
-        }
-
-        fn abs_works(f: f32) -> bool {
-            let sf = F32(f.to_bits());
-
-            sf.abs().0 == f.abs().to_bits()
-        }
-
-        fn neg_works(f: f32) -> bool {
-            let sf = F32(f.to_bits());
-
-            sf.neg().0 == f.neg().to_bits()
-        }
-
-        fn copy_sign_works(f: f32, g: f32) -> bool {
-            let sf = F32(f.to_bits());
-            let sg = F32(g.to_bits());
-
-            let same_sign = sf.is_sign_positive() == sg.is_sign_positive();
-            if same_sign {
-                sf.copy_sign(sg).0 == sf.0
-            } else {
-                sf.copy_sign(sg).0 == sf.neg().0
-            }
-        }
-
-        fn negative_neg_is_abs(f: u32) -> bool {
-            let f = F32(f);
-
-            f.is_sign_positive() || f.neg().0 == f.abs().0
-        }
-
-        fn add_works(a: f32, b: f32) -> bool {
-            let sa = F32(a.to_bits());
-            let sb = F32(b.to_bits());
-
-            (sa + sb).0 == (a + b).to_bits()
-        }
-
-        fn add_neg_is_zero(a: u32) -> bool {
-            let a = F32(a);
-            a.is_infinity() || a.is_nan() || (a + a.neg()).0 == F32::ZERO.0
-        }
-
-        fn sub_works(a: f32, b: f32) -> bool {
-            let sa = F32(a.to_bits());
-            let sb = F32(b.to_bits());
-
-            // (a, b) = (0.0, NaN) results in different NaNs on my machine
-            sa.is_nan() || sb.is_nan() || (sa - sb).0 == (a - b).to_bits()
-        }
-
-        fn sub_is_add_neg(a: u32, b: u32) -> bool {
-            let a = F32(a);
-            let b = F32(b);
-
-            a.is_nan() || b.is_nan() || a - b == a + b.neg()
-        }
-
-        fn mul_works(a: f32, b: f32) -> bool {
-            let sa = F32(a.to_bits());
-            let sb = F32(b.to_bits());
-
-            (sa * sb).0 == (a * b).to_bits()
         }
     }
 
@@ -309,179 +211,5 @@ mod test {
         assert!(F32::from_bits(0xffc00001).is_nan());
         // most significant bit not set and sign bit set
         assert!(F32::from_bits(0xff801001).is_nan());
-    }
-
-    #[test]
-    fn test_is_infinity() {
-        assert!(F32::INFINITY.is_infinity() && F32::NEG_INFINITY.is_infinity());
-        assert!(!F32::NAN.is_infinity());
-        assert!(!F32::ONE.is_infinity());
-    }
-
-    #[test]
-    fn test_is_zero() {
-        assert!(F32::ZERO.is_zero() && F32::NEG_ZERO.is_zero());
-        assert!(!F32::NAN.is_zero());
-        assert!(!F32::ONE.is_zero());
-    }
-
-    #[test]
-    fn test_add() {
-        // normal addition
-        assert_eq!(F32::ONE + F32::ZERO, F32::ONE);
-        assert_eq!(F32::ONE + F32::ONE, F32::from_bits(2f32.to_bits()));
-
-        // NaN propagation
-        assert_eq!((F32::NAN + F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NAN + F32::NEG_NAN).0, F32::NAN.0);
-        assert_eq!((F32::NEG_NAN + F32::NAN).0, F32::NEG_NAN.0);
-        assert_eq!((F32::NEG_NAN + F32::NEG_NAN).0, F32::NEG_NAN.0);
-        assert_eq!((F32::NAN + F32::INFINITY).0, F32::NAN.0);
-        assert_eq!((F32::ONE + F32::NEG_NAN).0, F32::NEG_NAN.0);
-        // all NaNs are canonical, so result should also be canonical
-        assert_eq!((F32::NAN + F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NEG_NAN + F32::NAN).0, F32::NEG_NAN.0);
-
-        // Infinities
-        assert_eq!((F32::INFINITY + F32::NEG_INFINITY).0, F32::NAN.0);
-        assert_eq!(F32::INFINITY + F32::INFINITY, F32::INFINITY);
-        assert_eq!(F32::NEG_INFINITY + F32::NEG_INFINITY, F32::NEG_INFINITY);
-        assert_eq!(F32::NEG_INFINITY + F32::ONE, F32::NEG_INFINITY);
-        assert_eq!(F32::ONE + F32::NEG_INFINITY, F32::NEG_INFINITY);
-        assert_eq!(F32::INFINITY + F32::ONE, F32::INFINITY);
-        assert_eq!(F32::ONE + F32::INFINITY, F32::INFINITY);
-
-        // Zeroes
-        assert_eq!((F32::ZERO + F32::NEG_ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::ZERO + F32::ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::NEG_ZERO + F32::NEG_ZERO).0, F32::NEG_ZERO.0);
-        assert_eq!(F32::ZERO + F32::INFINITY, F32::INFINITY);
-        assert_eq!(F32::INFINITY + F32::ZERO, F32::INFINITY);
-        assert_eq!(F32::NEG_ZERO + F32::NEG_INFINITY, F32::NEG_INFINITY);
-
-        // TODO: rounding
-    }
-
-    #[test]
-    fn test_sub() {
-        // normal subtraction
-        assert_eq!(F32(2.0f32.to_bits()) - F32::ONE, F32::ONE);
-
-        // NaN propagation
-        assert_eq!((F32::NAN - F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NAN - F32::NEG_NAN).0, F32::NAN.0);
-        assert_eq!((F32::NEG_NAN - F32::NAN).0, F32::NEG_NAN.0);
-        assert_eq!((F32::NEG_NAN - F32::NEG_NAN).0, F32::NEG_NAN.0);
-        assert_eq!((F32::NAN - F32::INFINITY).0, F32::NAN.0);
-        // TODO: it's somewhat surprising that this is not NEG_NAN, but it's within spec
-        assert_eq!((F32::ONE - F32::NEG_NAN).0, F32::NAN.0);
-        // all NaNs are canonical, so result should also be canonical
-        assert_eq!((F32::NAN - F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NEG_NAN - F32::NAN).0, F32::NEG_NAN.0);
-
-        // Infinities
-        assert_eq!((F32::INFINITY - F32::INFINITY).0, F32::NAN.0);
-        assert_eq!((F32::NEG_INFINITY - F32::NEG_INFINITY).0, F32::NAN.0);
-        assert_eq!(F32::INFINITY - F32::NEG_INFINITY, F32::INFINITY);
-        assert_eq!(F32::NEG_INFINITY - F32::INFINITY, F32::NEG_INFINITY);
-        assert_eq!(F32::INFINITY - F32::ONE, F32::INFINITY);
-        assert_eq!(F32::NEG_INFINITY - F32::ONE, F32::NEG_INFINITY);
-        assert_eq!(F32::ONE - F32::INFINITY, F32::NEG_INFINITY);
-        assert_eq!(F32::ONE - F32::NEG_INFINITY, F32::INFINITY);
-
-        // Zeroes
-        assert_eq!((F32::ZERO - F32::ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::NEG_ZERO - F32::NEG_ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::ZERO - F32::NEG_ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::NEG_ZERO - F32::ZERO).0, F32::NEG_ZERO.0);
-        assert_eq!(F32::ONE - F32::ZERO, F32::ONE);
-        assert_eq!(F32::ONE - F32::NEG_ZERO, F32::ONE);
-        assert_eq!(F32::ZERO - F32::ONE, F32::NEG_ONE);
-        assert_eq!(F32::NEG_ZERO - F32::ONE, F32::NEG_ONE);
-        assert_eq!((F32::ONE - F32::ONE).0, F32::ZERO.0);
-
-        // TODO: rounding
-    }
-
-    #[test]
-    fn test_mul() {
-        // normal multiplication
-        assert_eq!(
-            F32(2.0f32.to_bits()) * F32(2.0f32.to_bits()),
-            F32(4.0f32.to_bits())
-        );
-
-        // NaN propagation
-        assert_eq!((F32::NAN * F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NAN * F32::NEG_NAN).0, F32::NAN.0);
-        assert_eq!((F32::NEG_NAN * F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NEG_NAN * F32::NEG_NAN).0, F32::NAN.0);
-
-        // Zero and infinity
-        assert_eq!((F32::INFINITY * F32::ZERO).0, F32::NAN.0);
-        assert_eq!((F32::ZERO * F32::NEG_INFINITY).0, F32::NAN.0);
-        // NaN and infinity
-        assert_eq!((F32::NAN * F32::INFINITY).0, F32::NAN.0);
-        assert_eq!((F32::INFINITY * F32::NAN).0, F32::NAN.0);
-        assert_eq!((F32::NAN * F32::NEG_INFINITY).0, F32::NAN.0);
-        assert_eq!((F32::NEG_INFINITY * F32::NAN).0, F32::NAN.0);
-        // Infinities
-        assert_eq!(F32::INFINITY * F32::INFINITY, F32::INFINITY);
-        assert_eq!(F32::NEG_INFINITY * F32::NEG_INFINITY, F32::INFINITY);
-        assert_eq!(F32::INFINITY * F32::NEG_INFINITY, F32::NEG_INFINITY);
-        assert_eq!(F32::NEG_INFINITY * F32::INFINITY, F32::NEG_INFINITY);
-        // Infinity and value with opposite sign
-        assert_eq!(F32::INFINITY * F32::NEG_ONE, F32::NEG_INFINITY);
-        assert_eq!(F32::NEG_INFINITY * F32::ONE, F32::NEG_INFINITY);
-        assert_eq!(F32::ONE * F32::NEG_INFINITY, F32::NEG_INFINITY);
-        assert_eq!(F32::NEG_ONE * F32::INFINITY, F32::NEG_INFINITY);
-
-        // Zeroes
-        assert_eq!((F32::ZERO * F32::ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::NEG_ZERO * F32::NEG_ZERO).0, F32::ZERO.0);
-        assert_eq!((F32::ZERO * F32::NEG_ZERO).0, F32::NEG_ZERO.0);
-        assert_eq!((F32::NEG_ZERO * F32::ZERO).0, F32::NEG_ZERO.0);
-    }
-
-    #[test]
-    fn test_abs() {
-        assert_eq!(F32::ONE.abs(), F32::ONE);
-        assert_eq!(F32::NEG_ONE.abs(), F32::ONE);
-        assert_eq!(F32::ZERO.abs().0, F32::ZERO.0);
-        assert_eq!(F32::NEG_ZERO.abs().0, F32::ZERO.0);
-        assert_eq!(F32::INFINITY.abs(), F32::INFINITY);
-        assert_eq!(F32::NEG_INFINITY.abs(), F32::INFINITY);
-        assert_eq!(F32::NAN.abs().0, F32::NAN.0);
-        assert_eq!(F32::NEG_NAN.abs().0, F32::NAN.0);
-    }
-
-    #[test]
-    fn test_neg() {
-        assert_eq!(F32::ONE.neg(), F32::NEG_ONE);
-        assert_eq!(F32::NEG_ONE.neg(), F32::ONE);
-        assert_eq!(F32::ZERO.neg().0, F32::NEG_ZERO.0);
-        assert_eq!(F32::NEG_ZERO.neg().0, F32::ZERO.0);
-        assert_eq!(F32::INFINITY.neg(), F32::NEG_INFINITY);
-        assert_eq!(F32::NEG_INFINITY.neg(), F32::INFINITY);
-        assert_eq!(F32::NAN.neg().0, F32::NEG_NAN.0);
-        assert_eq!(F32::NEG_NAN.neg().0, F32::NAN.0);
-    }
-
-    #[test]
-    fn test_overflow() {
-        assert_eq!(
-            F32(f32::MAX.to_bits()) + F32::ONE,
-            F32((f32::MAX + 1.0f32).to_bits())
-        );
-
-        assert_eq!(
-            F32(0f32.to_bits()) - F32::ONE,
-            F32((0f32 - 1.0f32).to_bits())
-        );
-
-        assert_eq!(
-            F32(f32::MAX.to_bits()) * F32(1.5f32.to_bits()),
-            F32((f32::MAX * 1.5f32).to_bits())
-        );
     }
 }
