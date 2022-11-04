@@ -88,24 +88,25 @@ impl VisitorMut for FloatReplacer<'_> {
                 })
             }};
         }
-        macro_rules! match_unops {
-            ($op: expr, $($name: tt),*) => {
-                match $op {
-                    $(
-                        walrus::ir::UnaryOp::$name => call_fn!(map_ascii_case!(Case::Snake, stringify!($name))),
-                    )*
-                    _ => {}
-                }
+        macro_rules! call_op {
+            ($name: path) => {
+                call_fn!(map_ascii_case!(Case::Snake, stringify!($name)))
             };
         }
-        macro_rules! match_binops {
-            ($op: expr, $($name: tt),*) => {
-                match $op {
-                    $(
-                        walrus::ir::BinaryOp::$name => call_fn!(map_ascii_case!(Case::Snake, stringify!($name))),
-                    )*
-                    _ => {}
-                }
+        macro_rules! match_unop {
+            ($name: tt) => {
+                walrus::ir::UnaryOp::$name
+            };
+            ($name: tt { .. }) => {
+                walrus::ir::UnaryOp::$name { .. }
+            };
+        }
+        macro_rules! match_binop {
+            ($name: tt) => {
+                walrus::ir::BinaryOp::$name
+            };
+            ($name: tt { .. }) => {
+                walrus::ir::BinaryOp::$name { .. }
             };
         }
         match instr {
@@ -127,85 +128,149 @@ impl VisitorMut for FloatReplacer<'_> {
             Instr::Select(Select { ty: Some(ty) }) => change_type(ty),
             Instr::RefNull(RefNull { ty }) => change_type(ty),
             Instr::Unop(Unop { op }) => {
-                match_unops!(
-                    op,
-                    F32Abs,
-                    F32Neg,
-                    F32Ceil,
-                    F32Floor,
-                    F32Trunc,
-                    F32Nearest,
-                    F32Sqrt,
-                    F64Abs,
-                    F64Neg,
-                    F64Ceil,
-                    F64Floor,
-                    F64Trunc,
-                    F64Nearest,
-                    F64Sqrt,
-                    I32TruncSF32,
-                    I32TruncUF32,
-                    I32TruncSF64,
-                    I32TruncUF64,
-                    I64TruncSF32,
-                    I64TruncUF32,
-                    I64TruncSF64,
-                    I64TruncUF64,
-                    F32ConvertSI32,
-                    F32ConvertUI32,
-                    F32ConvertSI64,
-                    F32ConvertUI64,
-                    F32DemoteF64,
-                    F64ConvertSI32,
-                    F64ConvertUI32,
-                    F64ConvertSI64,
-                    F64ConvertUI64,
-                    F64PromoteF32,
-                    I32ReinterpretF32,
-                    I64ReinterpretF64,
-                    F32ReinterpretI32,
-                    F64ReinterpretI64,
-                    I32TruncSSatF32,
-                    I32TruncUSatF32,
-                    I32TruncSSatF64,
-                    I32TruncUSatF64,
-                    I64TruncSSatF32,
-                    I64TruncUSatF32,
-                    I64TruncSSatF64,
-                    I64TruncUSatF64
-                );
+                match op {
+                    match_unop!(F32Abs) => call_op!(F32Abs),
+                    match_unop!(F32Neg) => call_op!(F32Neg),
+                    match_unop!(F32Ceil) => call_op!(F32Ceil),
+                    match_unop!(F32Floor) => call_op!(F32Floor),
+                    match_unop!(F32Trunc) => call_op!(F32Trunc),
+                    match_unop!(F32Nearest) => call_op!(F32Nearest),
+                    match_unop!(F32Sqrt) => call_op!(F32Sqrt),
+                    match_unop!(F64Abs) => call_op!(F64Abs),
+                    match_unop!(F64Neg) => call_op!(F64Neg),
+                    match_unop!(F64Ceil) => call_op!(F64Ceil),
+                    match_unop!(F64Floor) => call_op!(F64Floor),
+                    match_unop!(F64Trunc) => call_op!(F64Trunc),
+                    match_unop!(F64Nearest) => call_op!(F64Nearest),
+                    match_unop!(F64Sqrt) => call_op!(F64Sqrt),
+                    match_unop!(I32TruncSF32) => call_op!(I32TruncSF32),
+                    match_unop!(I32TruncUF32) => call_op!(I32TruncUF32),
+                    match_unop!(I32TruncSF64) => call_op!(I32TruncSF64),
+                    match_unop!(I32TruncUF64) => call_op!(I32TruncUF64),
+                    match_unop!(I64TruncSF32) => call_op!(I64TruncSF32),
+                    match_unop!(I64TruncUF32) => call_op!(I64TruncUF32),
+                    match_unop!(I64TruncSF64) => call_op!(I64TruncSF64),
+                    match_unop!(I64TruncUF64) => call_op!(I64TruncUF64),
+                    match_unop!(F32ConvertSI32) => call_op!(F32ConvertSI32),
+                    match_unop!(F32ConvertUI32) => call_op!(F32ConvertUI32),
+                    match_unop!(F32ConvertSI64) => call_op!(F32ConvertSI64),
+                    match_unop!(F32ConvertUI64) => call_op!(F32ConvertUI64),
+                    match_unop!(F32DemoteF64) => call_op!(F32DemoteF64),
+                    match_unop!(F64ConvertSI32) => call_op!(F64ConvertSI32),
+                    match_unop!(F64ConvertUI32) => call_op!(F64ConvertUI32),
+                    match_unop!(F64ConvertSI64) => call_op!(F64ConvertSI64),
+                    match_unop!(F64ConvertUI64) => call_op!(F64ConvertUI64),
+                    match_unop!(F64PromoteF32) => call_op!(F64PromoteF32),
+                    match_unop!(I32ReinterpretF32) => call_op!(I32ReinterpretF32),
+                    match_unop!(I64ReinterpretF64) => call_op!(I64ReinterpretF64),
+                    match_unop!(F32ReinterpretI32) => call_op!(F32ReinterpretI32),
+                    match_unop!(F64ReinterpretI64) => call_op!(F64ReinterpretI64),
+                    match_unop!(I32TruncSSatF32) => call_op!(I32TruncSSatF32),
+                    match_unop!(I32TruncUSatF32) => call_op!(I32TruncUSatF32),
+                    match_unop!(I32TruncSSatF64) => call_op!(I32TruncSSatF64),
+                    match_unop!(I32TruncUSatF64) => call_op!(I32TruncUSatF64),
+                    match_unop!(I64TruncSSatF32) => call_op!(I64TruncSSatF32),
+                    match_unop!(I64TruncUSatF32) => call_op!(I64TruncUSatF32),
+                    match_unop!(I64TruncSSatF64) => call_op!(I64TruncSSatF64),
+                    match_unop!(I64TruncUSatF64) => call_op!(I64TruncUSatF64),
+                    // the following instructions are currently not supported in the softfloat library,
+                    // but are checked here in order to avoid accidentally keeing them in the wasm without warning.
+                    // This is necessary, since we change all types to i32 / i64).
+                    match_unop!(F32x4Splat) => call_op!(F32x4Splat),
+                    match_unop!(F32x4ExtractLane { .. }) => call_op!(F32x4ExtractLane),
+                    match_unop!(F64x2Splat) => call_op!(F64x2Splat),
+                    match_unop!(F64x2ExtractLane { .. }) => call_op!(F64x2ExtractLane),
+                    match_unop!(F32x4Ceil) => call_op!(F32x4Ceil),
+                    match_unop!(F32x4Floor) => call_op!(F32x4Floor),
+                    match_unop!(F32x4Trunc) => call_op!(F32x4Trunc),
+                    match_unop!(F32x4Nearest) => call_op!(F32x4Nearest),
+                    match_unop!(F64x2Ceil) => call_op!(F64x2Ceil),
+                    match_unop!(F64x2Floor) => call_op!(F64x2Floor),
+                    match_unop!(F64x2Trunc) => call_op!(F64x2Trunc),
+                    match_unop!(F64x2Nearest) => call_op!(F64x2Nearest),
+                    match_unop!(F32x4Abs) => call_op!(F32x4Abs),
+                    match_unop!(F32x4Neg) => call_op!(F32x4Neg),
+                    match_unop!(F32x4Sqrt) => call_op!(F32x4Sqrt),
+                    match_unop!(F64x2Abs) => call_op!(F64x2Abs),
+                    match_unop!(F64x2Neg) => call_op!(F64x2Neg),
+                    match_unop!(F64x2Sqrt) => call_op!(F64x2Sqrt),
+                    match_unop!(I32x4TruncSatF32x4S) => call_op!(I32x4TruncSatF32x4S),
+                    match_unop!(I32x4TruncSatF32x4U) => call_op!(I32x4TruncSatF32x4U),
+                    match_unop!(F32x4ConvertI32x4S) => call_op!(F32x4ConvertI32x4S),
+                    match_unop!(F32x4ConvertI32x4U) => call_op!(F32x4ConvertI32x4U),
+                    _ => {}
+                };
             }
-            Instr::Binop(Binop { op }) => {
-                match_binops!(
-                    op,
-                    F32Eq,
-                    F32Ne,
-                    F32Lt,
-                    F32Gt,
-                    F32Le,
-                    F32Ge,
-                    F64Eq,
-                    F64Ne,
-                    F64Lt,
-                    F64Gt,
-                    F64Le,
-                    F64Ge,
-                    F32Add,
-                    F32Sub,
-                    F32Mul,
-                    F32Div,
-                    F32Min,
-                    F32Max,
-                    F32Copysign,
-                    F64Add,
-                    F64Sub,
-                    F64Mul,
-                    F64Div,
-                    F64Min,
-                    F64Max,
-                    F64Copysign
-                );
-            }
+            Instr::Binop(Binop { op }) => match op {
+                match_binop!(F32Eq) => call_op!(F32Eq),
+                match_binop!(F32Ne) => call_op!(F32Ne),
+                match_binop!(F32Lt) => call_op!(F32Lt),
+                match_binop!(F32Gt) => call_op!(F32Gt),
+                match_binop!(F32Le) => call_op!(F32Le),
+                match_binop!(F32Ge) => call_op!(F32Ge),
+                match_binop!(F64Eq) => call_op!(F64Eq),
+                match_binop!(F64Ne) => call_op!(F64Ne),
+                match_binop!(F64Lt) => call_op!(F64Lt),
+                match_binop!(F64Gt) => call_op!(F64Gt),
+                match_binop!(F64Le) => call_op!(F64Le),
+                match_binop!(F64Ge) => call_op!(F64Ge),
+                match_binop!(F32Add) => call_op!(F32Add),
+                match_binop!(F32Sub) => call_op!(F32Sub),
+                match_binop!(F32Mul) => call_op!(F32Mul),
+                match_binop!(F32Div) => call_op!(F32Div),
+                match_binop!(F32Min) => call_op!(F32Min),
+                match_binop!(F32Max) => call_op!(F32Max),
+                match_binop!(F32Copysign) => call_op!(F32Copysign),
+                match_binop!(F64Add) => call_op!(F64Add),
+                match_binop!(F64Sub) => call_op!(F64Sub),
+                match_binop!(F64Mul) => call_op!(F64Mul),
+                match_binop!(F64Div) => call_op!(F64Div),
+                match_binop!(F64Min) => call_op!(F64Min),
+                match_binop!(F64Max) => call_op!(F64Max),
+                match_binop!(F64Copysign) => call_op!(F64Copysign),
+                // the following instructions are currently not supported in the softfloat library,
+                // see above for more info
+                match_binop!(F32x4ReplaceLane { .. }) => call_op!(F32x4ReplaceLane),
+                match_binop!(F64x2ReplaceLane { .. }) => call_op!(F64x2ReplaceLane),
+                match_binop!(F32x4Eq) => call_op!(F32x4Eq),
+                match_binop!(F32x4Ne) => call_op!(F32x4Ne),
+                match_binop!(F32x4Lt) => call_op!(F32x4Lt),
+                match_binop!(F32x4Gt) => call_op!(F32x4Gt),
+                match_binop!(F32x4Le) => call_op!(F32x4Le),
+                match_binop!(F32x4Ge) => call_op!(F32x4Ge),
+                match_binop!(F64x2Eq) => call_op!(F64x2Eq),
+                match_binop!(F64x2Ne) => call_op!(F64x2Ne),
+                match_binop!(F64x2Lt) => call_op!(F64x2Lt),
+                match_binop!(F64x2Gt) => call_op!(F64x2Gt),
+                match_binop!(F64x2Le) => call_op!(F64x2Le),
+                match_binop!(F64x2Ge) => call_op!(F64x2Ge),
+                match_binop!(F32x4Add) => call_op!(F32x4Add),
+                match_binop!(F32x4Sub) => call_op!(F32x4Sub),
+                match_binop!(F32x4Mul) => call_op!(F32x4Mul),
+                match_binop!(F32x4Div) => call_op!(F32x4Div),
+                match_binop!(F32x4Min) => call_op!(F32x4Min),
+                match_binop!(F32x4Max) => call_op!(F32x4Max),
+                match_binop!(F32x4PMin) => call_op!(F32x4PMin),
+                match_binop!(F32x4PMax) => call_op!(F32x4PMax),
+                match_binop!(F64x2Add) => call_op!(F64x2Add),
+                match_binop!(F64x2Sub) => call_op!(F64x2Sub),
+                match_binop!(F64x2Mul) => call_op!(F64x2Mul),
+                match_binop!(F64x2Div) => call_op!(F64x2Div),
+                match_binop!(F64x2Min) => call_op!(F64x2Min),
+                match_binop!(F64x2Max) => call_op!(F64x2Max),
+                match_binop!(F64x2PMin) => call_op!(F64x2PMin),
+                match_binop!(F64x2PMax) => call_op!(F64x2PMax),
+                // these are not implemented yet in the `wasmparser` version backing `walrus`
+                // match_binop!(F32x4RelaxedMin) => call_op!(F32x4RelaxedMin),
+                // match_binop!(F32x4RelaxedMax) => call_op!(F32x4RelaxedMax),
+                // match_binop!(F64x2RelaxedMin) => call_op!(F64x2RelaxedMin),
+                // match_binop!(F64x2RelaxedMax) => call_op!(F64x2RelaxedMax),
+                // match_binop!(F32x4Fma) => call_op!(F32x4Fma),
+                // match_binop!(F32x4Fms) => call_op!(F32x4Fms),
+                // match_binop!(F64x2Fma) => call_op!(F64x2Fma),
+                // match_binop!(F64x2Fm) => call_op!(F64x2Fm),
+                _ => {}
+            },
             _ => {}
         }
     }
