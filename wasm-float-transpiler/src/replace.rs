@@ -164,7 +164,15 @@ impl VisitorMut for FloatReplacer<'_> {
                     I32ReinterpretF32,
                     I64ReinterpretF64,
                     F32ReinterpretI32,
-                    F64ReinterpretI64
+                    F64ReinterpretI64,
+                    I32TruncSSatF32,
+                    I32TruncUSatF32,
+                    I32TruncSSatF64,
+                    I32TruncUSatF64,
+                    I64TruncSSatF32,
+                    I64TruncUSatF32,
+                    I64TruncSSatF64,
+                    I64TruncUSatF64
                 );
             }
             Instr::Binop(Binop { op }) => {

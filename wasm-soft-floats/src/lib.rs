@@ -202,6 +202,38 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_32(v: u32) -> i32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_u_sat_f_32(v: u32) -> u32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_64(v: u64) -> i32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_u_sat_f_64(v: u64) -> u32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_s_sat_f_32(v: u32) -> i64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_u_sat_f_32(v: u32) -> u64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_s_sat_f_64(v: u64) -> i64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_u_sat_f_64(v: u64) -> u64 {
+        todo!()
+    }
+    #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_lt(a: u32, b: u32) -> u32 {
         bool(F32::new(a) < F32::new(b))
     }
@@ -400,6 +432,38 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_promote_f_32(v: u32) -> u64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_32(v: u32) -> i32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_u_sat_f_32(v: u32) -> u32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_64(v: u64) -> i32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_u_sat_f_64(v: u64) -> u32 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_s_sat_f_32(v: u32) -> i64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_u_sat_f_32(v: u32) -> u64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_s_sat_f_64(v: u64) -> i64 {
+        todo!()
+    }
+    #[no_mangle]
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_u_sat_f_64(v: u64) -> u64 {
         todo!()
     }
     #[no_mangle]
