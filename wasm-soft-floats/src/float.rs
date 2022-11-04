@@ -1,22 +1,12 @@
 //! Software emulated floating point operations.
 //!
-//! https://webassembly.github.io/spec/core/exec/numerics.html#floating-point-operations
-//! # Rounding
-//! round-to-nearest ties-to-even
+//! This module contains a small subset of all softfloat operations for 32-bit and 64-bit floats.
 //!
-//! # NaN propagation
-//! According to WebAssembly spec, the sign and payload are non-deterministic,
-//! but this crate will always return the same result for the same input,
-//! regardless of CPU architecture / instruction set.
-//!
-//! # Scope
-//! This implementation only provides very basic operations for now to fill in the gaps of the other backends.
+//! These are just the most basic operations to fill in the gaps in other softfloat backends.
+//! It also makes sense, because these operations are so basic that
+//! it does not make sense to reimplement their `__wasm_soft_float_*` functions for every library.
 
 use core::ops::Neg;
-
-trait Test {
-    fn test();
-}
 
 macro_rules! impl_float {
     ($name: ident, $bits: ident, $exp_bits: tt) => {
@@ -60,7 +50,7 @@ macro_rules! impl_float {
             }
 
             /// Returns true if `self` is positive or negative infinity.
-            pub const fn is_infinity(self) -> bool {
+            pub const fn is_infinite(self) -> bool {
                 (self.0 & (Self::EXP_MASK | Self::FRAC_MASK)) == Self::EXP_MASK
             }
 
@@ -126,42 +116,6 @@ macro_rules! impl_float {
 
 impl_float!(F32, u32, 8);
 impl_float!(F64, u64, 11);
-
-impl F32 {
-    /// Returns the same value as `self`, but with as a `F64`.
-    ///
-    /// Example:
-    /// ```
-    /// use wasm_soft_floats::{F32, F64};
-    /// assert_eq!(F32::from_bits(3.678f32.to_bits()).promote().to_bits(), F64::from_bits(3.678f64.to_bits()).to_bits());
-    /// ```
-    pub fn promote(self) -> F64 {
-        // handle NaNs
-        if self.is_nan() {
-            return F64::NAN;
-        }
-
-        const BIT_DIFF: usize = F64::BIT_SIZE - F32::BIT_SIZE;
-        const EXP_DIFF: usize = F64::EXP_BITS - F32::EXP_BITS;
-        println!("{} {}", BIT_DIFF, EXP_DIFF);
-        let exp_bits = self.0 & Self::EXP_MASK;
-        let frac_bits = self.0 & Self::FRAC_MASK;
-        let sign_bit = self.0 & Self::SIGN_MASK;
-        println!("{:032b}\n{:032b}\n{:032b}", exp_bits, frac_bits, sign_bit);
-        // get all the parts of the float
-        let exp_bits = (self.0 & Self::EXP_MASK) as u64;
-        let frac_bits = (self.0 & Self::FRAC_MASK) as u64;
-        let sign_bit = (self.0 & Self::SIGN_MASK) as u64;
-
-        println!("{:064b}\n{:064b}\n{:064b}", exp_bits, frac_bits, sign_bit);
-        // shift the bits to the right place
-        let exp_bits = exp_bits << (BIT_DIFF - EXP_DIFF);
-        let sign_bit = sign_bit << BIT_DIFF;
-        // combine the bits
-        let bits = exp_bits | frac_bits | sign_bit;
-        F64(bits)
-    }
-}
 
 #[cfg(test)]
 mod tests {

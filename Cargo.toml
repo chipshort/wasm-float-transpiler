@@ -1,12 +1,6 @@
 [workspace]
 
-members = [
-    "wasm-float-runtime",
-    "wasm-float-transpiler",
-    "wasm-soft-floats",
-    "wasm-test",
-    "test-contract",
-]
+members = ["wasm-float-transpiler", "wasm-soft-floats", "cw-float"]
 
 [profile.release]
 opt-level = 3

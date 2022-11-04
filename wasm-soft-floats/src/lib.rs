@@ -4,10 +4,11 @@
 //! of the software floating point operations.
 //!
 //! Usage is quite simple, just add it as a dependency to your `Cargo.toml` and
-//! call the `wasm_soft_floats::import_soft_floats!()` macro inside your code.
-//! You can optionally choose between different backends for the soft float operations using this crates features.
+//! insert `pub use wasm_soft_floats::*` inside your code to include the softfloat functions.
+//! The transpiler can then pick these up and replace the float operations with calls to them.
+//! You can optionally choose between different backends for the soft float operations using this crate's features.
 
-mod float;
+pub(crate) mod float;
 
 pub use advanced_ops::*;
 pub use simple_ops::*;
@@ -86,7 +87,7 @@ mod advanced_ops {
         softfp::RoundingMode::TiesToEven
     }
     #[no_mangle]
-    fn softfp_set_exception_flags(flags: softfp::ExceptionFlags) {}
+    fn softfp_set_exception_flags(_flags: softfp::ExceptionFlags) {}
 
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_ceil(v: u32) -> u32 {
@@ -282,7 +283,7 @@ mod advanced_ops {
     }
 }
 
-#[cfg(feature = "rustc_apfloat")]
+#[cfg(all(feature = "rustc_apfloat", not(feature = "softfp")))]
 mod advanced_ops {
     use super::*;
     use rustc_apfloat::ieee::{Double, Single};
@@ -306,7 +307,7 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_sqrt(v: u32) -> u32 {
-        (v as f32 * 2.4f32) as u32
+        todo!()
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_ceil(v: u64) -> u64 {
