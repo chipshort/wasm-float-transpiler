@@ -12,23 +12,10 @@ default = ["softfp"]
 rustc_apfloat = ["dep:rustc_apfloat"]
 softfp = ["dep:softfp"]
 
-[profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-
 [dependencies]
-# simple-soft-float = "0.1" # very big
-# rug # uses mpfr under the hood
-# dashu-float = "0.2"
-# https://github.com/huonw/float
-# amplify_apfloat = "0.1.3" ???
-
 # Pinning version here to avoid possible changes in determinism
 softfp = { version = "=0.1.0", default-features = false, optional = true }
 rustc_apfloat = { version = "=0.1.3", optional = true }
-# num-traits = "0.2"
 
 [dev-dependencies]
 quickcheck = "1.0"

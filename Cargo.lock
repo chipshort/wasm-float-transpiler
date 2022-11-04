@@ -1051,6 +1051,7 @@ checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 [[package]]
 name = "walrus"
 version = "0.19.0"
+source = "git+https://github.com/chipshort/walrus.git?rev=b4954b45024edff4a8f704f83a130ca892f601d9#b4954b45024edff4a8f704f83a130ca892f601d9"
 dependencies = [
  "anyhow",
  "id-arena",
@@ -1064,6 +1065,7 @@ dependencies = [
 [[package]]
 name = "walrus-macro"
 version = "0.19.0"
+source = "git+https://github.com/chipshort/walrus.git?rev=b4954b45024edff4a8f704f83a130ca892f601d9#b4954b45024edff4a8f704f83a130ca892f601d9"
 dependencies = [
  "heck",
  "proc-macro2",

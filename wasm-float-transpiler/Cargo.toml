@@ -6,7 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-walrus = { path = "../../walrus", features = ["parallel"] }
+# Currently depending on my own fork of walrus, because upstream does not have all the mutable access I need,
+# but it's only a few lines of changes.
+# See https://github.com/rustwasm/walrus/pull/237
+walrus = { git = "https://github.com/chipshort/walrus.git", rev = "b4954b45024edff4a8f704f83a130ca892f601d9", features = [
+    "parallel",
+] }
 rayon = "1.5"
 anyhow = "1"
 const_format = { version = "0.2.30", features = ["rust_1_51"] }

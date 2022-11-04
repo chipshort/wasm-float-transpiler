@@ -287,7 +287,7 @@ mod advanced_ops {
 mod advanced_ops {
     use super::*;
     use rustc_apfloat::ieee::{Double, Single};
-    use rustc_apfloat::{Float, FloatConvert, Round};
+    use rustc_apfloat::Float;
 
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_ceil(v: u32) -> u32 {

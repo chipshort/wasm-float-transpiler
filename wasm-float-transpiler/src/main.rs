@@ -26,7 +26,7 @@ fn main() -> Result<()> {
 
     replace::replace_float_operations(&mut module)?;
 
-    // walrus::passes::gc::run(&mut module);
+    walrus::passes::gc::run(&mut module);
 
     let wasm = module.emit_wasm();
     std::fs::write(output, wasm)?;
