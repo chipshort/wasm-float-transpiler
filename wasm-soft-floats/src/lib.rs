@@ -130,7 +130,7 @@ mod advanced_ops {
         F64::new(v).square_root().0
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_32(v: u32) -> u32 {
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_32(v: u32) -> i32 {
         todo!()
     }
     #[no_mangle]
@@ -138,7 +138,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_64(v: u64) -> u32 {
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_64(v: u64) -> i32 {
         todo!()
     }
     #[no_mangle]
@@ -146,7 +146,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_32(v: u32) -> u64 {
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_32(v: u32) -> i64 {
         todo!()
     }
     #[no_mangle]
@@ -154,7 +154,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_64(v: u64) -> u64 {
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_64(v: u64) -> i64 {
         todo!()
     }
     #[no_mangle]
@@ -170,7 +170,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_f_32_convert_si_64(v: i64) -> i64 {
+    pub extern "C" fn __wasm_soft_float_f_32_convert_si_64(v: i64) -> u32 {
         todo!()
     }
     #[no_mangle]
@@ -190,7 +190,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_f_64_convert_si_64(v: i64) -> i64 {
+    pub extern "C" fn __wasm_soft_float_f_64_convert_si_64(v: i64) -> u64 {
         todo!()
     }
     #[no_mangle]
@@ -319,23 +319,29 @@ mod advanced_ops {
 mod advanced_ops {
     use super::*;
     use rustc_apfloat::ieee::{Double, Single};
-    use rustc_apfloat::Float;
+    use rustc_apfloat::{Float, FloatConvert, Round, StatusAnd};
 
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_ceil(v: u32) -> u32 {
-        todo!()
+        let v = Single::from_bits(v as u128);
+        v.round_to_integral(Round::TowardPositive).value.to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_floor(v: u32) -> u32 {
-        todo!()
+        let v = Single::from_bits(v as u128);
+        v.round_to_integral(Round::TowardNegative).value.to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_trunc(v: u32) -> u32 {
-        todo!()
+        let v = Single::from_bits(v as u128);
+        v.round_to_integral(Round::TowardZero).value.to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_nearest(v: u32) -> u32 {
-        todo!()
+        let v = Single::from_bits(v as u128);
+        v.round_to_integral(Round::NearestTiesToEven)
+            .value
+            .to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_sqrt(v: u32) -> u32 {
@@ -343,26 +349,32 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_ceil(v: u64) -> u64 {
-        todo!()
+        let v = Double::from_bits(v as u128);
+        v.round_to_integral(Round::TowardPositive).value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_floor(v: u64) -> u64 {
-        todo!()
+        let v = Double::from_bits(v as u128);
+        v.round_to_integral(Round::TowardNegative).value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_trunc(v: u64) -> u64 {
-        todo!()
+        let v = Double::from_bits(v as u128);
+        v.round_to_integral(Round::TowardZero).value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_nearest(v: u64) -> u64 {
-        todo!()
+        let v = Double::from_bits(v as u128);
+        v.round_to_integral(Round::NearestTiesToEven)
+            .value
+            .to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_sqrt(v: u64) -> u64 {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_32(v: u32) -> u32 {
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_32(v: u32) -> i32 {
         todo!()
     }
     #[no_mangle]
@@ -370,7 +382,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_64(v: u64) -> u32 {
+    pub extern "C" fn __wasm_soft_float_i_32_trunc_sf_64(v: u64) -> i32 {
         todo!()
     }
     #[no_mangle]
@@ -378,7 +390,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_32(v: u32) -> u64 {
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_32(v: u32) -> i64 {
         todo!()
     }
     #[no_mangle]
@@ -386,7 +398,7 @@ mod advanced_ops {
         todo!()
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_64(v: u64) -> u64 {
+    pub extern "C" fn __wasm_soft_float_i_64_trunc_sf_64(v: u64) -> i64 {
         todo!()
     }
     #[no_mangle]
@@ -395,15 +407,18 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_convert_si_32(v: i32) -> u32 {
-        todo!()
+        let res = Single::from_i128(v as i128);
+        res.value.to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_convert_ui_32(v: u32) -> u32 {
-        todo!()
+        let res = Single::from_u128(v as u128);
+        res.value.to_bits() as u32
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_f_32_convert_si_64(v: i64) -> i64 {
-        todo!()
+    pub extern "C" fn __wasm_soft_float_f_32_convert_si_64(v: i64) -> u32 {
+        let res = Single::from_i128(v as i128);
+        res.value.to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_convert_ui_64(v: u64) -> u32 {
@@ -412,27 +427,33 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_demote_f_64(v: u64) -> u32 {
-        todo!()
+        let res: StatusAnd<Single> = Double::from_u128(v as u128).value.convert(&mut false);
+        res.value.to_bits() as u32
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_convert_si_32(v: i32) -> u64 {
-        todo!()
+        let res = Double::from_i128(v as i128);
+        res.value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_convert_ui_32(v: u32) -> u64 {
-        todo!()
+        let res = Double::from_u128(v as u128);
+        res.value.to_bits() as u64
     }
     #[no_mangle]
-    pub extern "C" fn __wasm_soft_float_f_64_convert_si_64(v: i64) -> i64 {
-        todo!()
+    pub extern "C" fn __wasm_soft_float_f_64_convert_si_64(v: i64) -> u64 {
+        let res = Double::from_i128(v as i128);
+        res.value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_convert_ui_64(v: u64) -> u64 {
-        todo!()
+        let res = Double::from_u128(v as u128);
+        res.value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_promote_f_32(v: u32) -> u64 {
-        todo!()
+        let res: StatusAnd<Double> = Single::from_u128(v as u128).value.convert(&mut false);
+        res.value.to_bits() as u64
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_32(v: u32) -> i32 {
@@ -566,11 +587,7 @@ mod advanced_ops {
 
 #[inline(always)]
 fn bool(v: bool) -> u32 {
-    if v {
-        1
-    } else {
-        0
-    }
+    u32::from(v)
 }
 
 // reinterpret instructions are handled as noop in the transpiler
