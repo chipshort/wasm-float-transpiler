@@ -179,7 +179,8 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_32_demote_f_64(v: u64) -> u32 {
-        todo!()
+        let v: F32 = F64::new(v).convert_format();
+        v.0
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_convert_si_32(v: i32) -> u64 {
@@ -199,7 +200,8 @@ mod advanced_ops {
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_f_64_promote_f_32(v: u32) -> u64 {
-        todo!()
+        let v: F64 = F32::new(v).convert_format();
+        v.0
     }
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_32(v: u32) -> i32 {
