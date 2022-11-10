@@ -945,6 +945,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "softfloat-c"
+version = "3.0.0"
+source = "git+https://github.com/chipshort/softfloat-c.git?rev=16f70b82719a395a0abc0859a6f585f09f0af7a0#16f70b82719a395a0abc0859a6f585f09f0af7a0"
+
+[[package]]
 name = "softfp"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1095,6 +1100,7 @@ version = "0.1.0"
 dependencies = [
  "quickcheck",
  "rustc_apfloat",
+ "softfloat-c",
  "softfp",
 ]
 

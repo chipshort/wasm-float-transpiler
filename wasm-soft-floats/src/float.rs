@@ -38,6 +38,10 @@ macro_rules! impl_float {
                 self.0 & Self::SIGN_MASK == 0
             }
 
+            pub const fn is_subnormal(self) -> bool {
+                self.0 & Self::EXP_MASK == 0 && self.0 & Self::FRAC_MASK != 0
+            }
+
             /// Returns `self`, but with the sign bit set to `other`'s sign bit.
             ///
             pub const fn copy_sign(self, other: Self) -> Self {
