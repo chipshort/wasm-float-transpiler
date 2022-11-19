@@ -32,4 +32,13 @@ point operations and with only the softfloat functions that you actually use.
 # Example
 
 Check out the [examples](./examples) folder.
-To compile 
+To compile the examples run:
+```bash
+cd examples
+cargo build --target wasm32-unknown-unknown --release --workspace
+cd ..
+```
+To then transpile the resulting wasm, run:
+```bash
+cargo run -p wasm-float-transpiler -- ./examples/target/wasm32-unknown-unknown/release/basic_wasm_float.wasm output.wasm
+```
