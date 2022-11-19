@@ -1,0 +1,17 @@
+[package]
+name = "wasm-soft-float-bs"
+description = "Software float implementation for WebAssembly based on the Berkeley SoftFloat library"
+authors = { workspace = true }
+version = { workspace = true }
+edition = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Pinning version here to avoid possible upstream changes in determinism
+softfloat-c = { git = "https://github.com/chipshort/softfloat-c.git", rev = "16f70b82719a395a0abc0859a6f585f09f0af7a0" }
+wasm-soft-float-utils = { path = "../../util", version = "0.1" }
+
+[dev-dependencies]
+quickcheck = "1.0"

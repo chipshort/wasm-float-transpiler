@@ -1,4 +1,4 @@
-pub use wasm_soft_floats::*;
+pub use wasm_soft_float_apfloat::*;
 
 pub mod contract;
 mod error;

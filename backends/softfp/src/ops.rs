@@ -1,5 +1,5 @@
-use crate::bool;
 use softfp::{F32, F64};
+use wasm_soft_float_utils::bool;
 
 // special functions needed for the softfp crate
 #[no_mangle]

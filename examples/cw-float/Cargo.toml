@@ -22,9 +22,7 @@ backtraces = ["cosmwasm-std/backtraces"]
 library = []
 
 [dependencies]
-wasm-soft-floats = { path = "../wasm-soft-floats", default-features = false, features = [
-  "rustc_apfloat",
-] }
+wasm-soft-float-apfloat = { path = "../../backends/apfloat" }
 cosmwasm-schema = "1.1.3"
 cosmwasm-std = "1.1.3"
 cosmwasm-storage = "1.1.3"

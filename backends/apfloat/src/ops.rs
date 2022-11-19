@@ -145,7 +145,7 @@ pub extern "C" fn __wasm_soft_float_f_64_promote_f_32(v: u32) -> u64 {
     res.value.to_bits() as u64
 }
 // I think we can actually just call the non-sat versions here, since `rustc_apfloat` always saturates.
-// The overflow behaviour of the non-saturating versions is just not defined.
+// The overflow behaviour of the non-saturating versions is just not defined in the wasm spec (which is why these exist).
 // #[no_mangle]
 // pub extern "C" fn __wasm_soft_float_i_32_trunc_s_sat_f_32(v: u32) -> i32 {
 //     todo!()
@@ -212,7 +212,6 @@ pub extern "C" fn __wasm_soft_float_f_64_ge(a: u64, b: u64) -> u32 {
 }
 #[no_mangle]
 pub extern "C" fn __wasm_soft_float_f_32_add(a: u32, b: u32) -> u32 {
-    println!("f32 add");
     let res = Single::from_bits(a as u128) + Single::from_bits(b as u128);
     res.value.to_bits() as u32
 }

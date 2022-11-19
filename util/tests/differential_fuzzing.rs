@@ -1,5 +1,5 @@
 use quickcheck::quickcheck;
-use wasm_soft_floats::*;
+use wasm_soft_float_utils::*;
 
 quickcheck! {
     fn abs_works(f: f32) -> bool {

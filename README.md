@@ -6,8 +6,21 @@ The instructions are replaced with deterministic software implementations of the
 # Usage
 
 In order to include the softfloat implementation in your project,
-add the `wasm-soft-floats` crate as a dependency and include it in your build by adding a
-`pub use wasm_soft_floats::*;` to your project.
+choose one of the `wasm-soft-float-*` backend crates as a dependency and include it in your build by adding a
+`pub use wasm_soft_floats_*::*;` to your project.
+
+Check out the [backends](./backends) folder for the complete set of backend options and their supported operations.
+Your best bet is probably `wasm-soft-float-bs` based on the Berkeley Softfloat library. It covers almost all instructions.
+
+Example `lib.rs`:
+```rust
+pub use wasm_soft_float_bs::*;
+
+#[no_mangle]
+pub extern "C" fn test(a: f32, b: f32) -> f32 {
+    a + b
+}
+```
 
 Then compile your project and call `wasm-float-transpiler` on your `wasm` file, like this:
 ```bash
@@ -15,3 +28,8 @@ wasm-float-transpiler my_project.wasm output.wasm
 ```
 The resulting `output.wasm` file now contains your finished WebAssembly without any trace of floating
 point operations and with only the softfloat functions that you actually use.
+
+# Example
+
+Check out the [examples](./examples) folder.
+To compile 

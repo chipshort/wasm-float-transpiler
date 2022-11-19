@@ -1,0 +1,16 @@
+[package]
+name = "wasm-soft-float-softfp"
+description = "Software float implementation for WebAssembly based on the softfp crate"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Pinning version here to avoid possible upstream changes in determinism
+softfp = { version = "=0.1.0", default-features = false }
+wasm-soft-float-utils = { path = "../../util", version = "0.1" }
+
+[dev-dependencies]
+quickcheck = "1.0"

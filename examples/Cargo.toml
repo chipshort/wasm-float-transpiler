@@ -1,5 +1,5 @@
 [workspace]
-members = ["wasm-float-transpiler", "util", "backends/*"]
+members = ["basic", "cw-float"]
 
 [workspace.package]
 authors = ["Christoph Otter <chipshort@protonmail.com>"]

@@ -1,0 +1,12 @@
+[package]
+name = "basic-wasm-float"
+authors = { workspace = true }
+version = { workspace = true }
+edition = { workspace = true }
+
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-soft-float-bs = { path = "../../backends/bs" }

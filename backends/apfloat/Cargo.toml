@@ -1,0 +1,17 @@
+[package]
+name = "wasm-soft-float-apfloat"
+description = "Software float implementation for WebAssembly based on the rustc_apfloat crate"
+version = { workspace = true }
+edition = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Pinning version here to avoid possible upstream changes in determinism
+rustc_apfloat = { version = "=0.1.3" }
+wasm-soft-float-utils = { path = "../../util", version = "0.1" }
+
+[dev-dependencies]
+quickcheck = "1.0"

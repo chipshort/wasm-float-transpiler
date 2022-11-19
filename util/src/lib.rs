@@ -1,23 +1,16 @@
 //! Software floating point library for WebAssembly.
 //!
-//! This is a companion crate for `wasm-float-transpiler` that provides the actual implementation
-//! of the software floating point operations.
-//!
-//! Usage is quite simple, just add it as a dependency to your `Cargo.toml` and
-//! insert `pub use wasm_soft_floats::*` inside your code to include the softfloat functions.
-//! The transpiler can then pick these up and replace the float operations with calls to them.
-//! You can optionally choose between different backends for the soft float operations using this crate's features.
+//! This is a utility crate for wasm softfloat backends that provides some basic operations.
+//! You probably want to use one of the backend crates instead of this one.
 
-mod backend;
-pub(crate) mod float;
+pub mod float;
+pub mod test;
 
-pub use backend::*;
 pub use simple_ops::*;
 
 mod simple_ops {
-    use super::*;
+    use super::{bool, float::*};
     use core::ops::Neg;
-    use float::{F32, F64};
 
     #[no_mangle]
     pub extern "C" fn __wasm_soft_float_i_32_reinterpret_f_32(v: u32) -> u32 {
@@ -78,9 +71,8 @@ mod simple_ops {
 }
 
 #[inline(always)]
-pub(crate) fn bool(v: bool) -> u32 {
+pub fn bool(v: bool) -> u32 {
     u32::from(v)
 }
 
-// reinterpret instructions are handled as noop in the transpiler
 // load and store instructions are converted to integer loads / stores in the transpiler
